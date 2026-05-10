@@ -1,6 +1,7 @@
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { examListing } from "@/db/schema";
+import { augmentDbConnectionErrorMessage } from "@/lib/db-connection-hint";
 
 export const runtime = "nodejs";
 
@@ -74,8 +75,9 @@ export async function GET() {
         : e instanceof Error
           ? e.message
           : "Database error";
+    const message = augmentDbConnectionErrorMessage(nested);
     return Response.json(
-      { exams: [], error: nested },
+      { exams: [], error: message },
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }

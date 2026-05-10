@@ -132,11 +132,12 @@ export function ExamDirectoryClient({ restrictLevels, variant = "full" }: ExamDi
       {loadError ? (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           <p className="font-medium">Could not load exam listings.</p>
-          <p className="mt-1 text-xs opacity-90">{loadError}</p>
+          <p className="mt-1 whitespace-pre-wrap text-xs opacity-90">{loadError}</p>
           <p className="mt-2 text-xs text-muted-foreground">
-            Often this means Postgres is stopped, or the DB is missing newer columns (
-            <code className="text-foreground">soonest_bookable_at</code>, etc.). Run{" "}
-            <code className="text-foreground">npm run db:push</code> from the project root, then reload.
+            Local dev: start Postgres or fix <code className="text-foreground">DATABASE_URL</code>; run{" "}
+            <code className="text-foreground">npm run db:push</code> if columns are outdated. Hosted deploys need a
+            cloud <code className="text-foreground">DATABASE_URL</code> — not{" "}
+            <code className="text-foreground">localhost</code>.
           </p>
         </div>
       ) : null}
