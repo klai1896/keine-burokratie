@@ -9,9 +9,9 @@ export function augmentDbConnectionErrorMessage(raw: string): string {
   if (isLocalRefusal || (onVercel && /ECONNREFUSED|connect.*refused/i.test(t))) {
     return `${raw}
 
-Production / Vercel: there is no PostgreSQL on the app server’s localhost. In the Vercel dashboard open your project → Settings → Environment Variables, set DATABASE_URL to a hosted Postgres URL (Neon, Supabase, Vercel Postgres, etc.) for Production — and Preview if you preview with the DB — then redeploy.
+Production / Vercel: there is no PostgreSQL on the app server’s localhost. Fix it by either: (1) connecting your Vercel Postgres store to the project so POSTGRES_URL (or DATABASE_URL) appears in Environment Variables, or (2) manually setting DATABASE_URL to your hosted connection string for Production — then redeploy.
 
-Local dev DATABASE_URL copied into Vercel will not work unless it tunnels to your machine (not recommended). Leave DATABASE_URL unset in Vercel if you intentionally avoid DB routes (broken until you add a real URL).`;
+If you use Vercel Storage but still see localhost, pull latest code: the app now uses POSTGRES_URL when DATABASE_URL is unset.`;
   }
 
   return raw;

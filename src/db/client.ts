@@ -2,19 +2,24 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "./schema";
 
-function envDatabaseUrl(): string | undefined {
-  const u = process.env.DATABASE_URL?.trim();
-  return u ? u : undefined;
+/**
+ * Vercel Storage / marketplace Postgres often injects `POSTGRES_URL` (or `POSTGRES_PRISMA_URL`);
+ * this app historically used `DATABASE_URL` only. Prefer explicit DATABASE_URL when set.
+ */
+export function envDatabaseUrl(): string | undefined {
+  const u =
+    process.env.DATABASE_URL?.trim() ||
+    process.env.POSTGRES_URL?.trim() ||
+    process.env.POSTGRES_PRISMA_URL?.trim();
+  return u || undefined;
 }
 
-/** Local dev fallback only — Vercel must set DATABASE_URL to a hosted Postgres URL. */
-const connectionString =
-  envDatabaseUrl() ??
-  "postgresql://localhost:5432/keine_burokratie";
+/** Local dev fallback only — on Vercel use DATABASE_URL or linked Storage `POSTGRES_URL`. */
+const connectionString = envDatabaseUrl() ?? "postgresql://localhost:5432/keine_burokratie";
 
 if (process.env.VERCEL === "1" && !envDatabaseUrl()) {
   console.error(
-    "[db] DATABASE_URL is missing. Set it under Vercel → Settings → Environment Variables (hosted Postgres URL), then redeploy.",
+    "[db] No Postgres URL: set DATABASE_URL, or connect Vercel Postgres so POSTGRES_URL is injected, then redeploy.",
   );
 }
 
