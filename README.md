@@ -1,6 +1,8 @@
 # Keine Bürokratie
 
-Internal codename for the **Berlin relocation & immigration companion** MVP described in [`docs/prd.md`](docs/prd.md), [`docs/rfc.md`](docs/rfc.md), and [`docs/engineering-spec.md`](docs/engineering-spec.md) (copied from the `product-team-agents` documentation set).
+Internal codename for the **Berlin relocation & immigration companion** MVP described in [`docs/prd.md`](docs/prd.md), [`docs/rfc.md`](docs/rfc.md), and [`docs/engineering-spec.md`](docs/engineering-spec.md).
+
+**How to read the docs:** start with [`docs/README.md`](docs/README.md), which summarises each file (PRD vs RFC vs engineering spec) and when to consult which.
 
 English-only UI · modular monolith (Next.js + PostgreSQL + poll worker).
 

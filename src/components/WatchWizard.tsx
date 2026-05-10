@@ -2,7 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-type Target = { id: string; labelEn: string; officialUrl: string; slug: string };
+export type ServiceTargetRow = { id: string; labelEn: string; officialUrl: string; slug: string };
+
+export type WatchWizardProps = {
+  /** When set, skips loading `/api/service-targets` and uses these rows (e.g. parent already fetched). */
+  targets?: ServiceTargetRow[];
+  /** Controlled selected `service_target` id; pair with `onSelectedTargetIdChange` from a parent picker. */
+  selectedTargetId?: string;
+  onSelectedTargetIdChange?: (id: string) => void;
+};
 
 const weekdayDefs: { value: number; label: string }[] = [
   { value: 1, label: "Monday" },
@@ -13,10 +21,11 @@ const weekdayDefs: { value: number; label: string }[] = [
   { value: 6, label: "Saturday" },
 ];
 
-export function WatchWizard() {
-  const [targets, setTargets] = useState<Target[]>([]);
+export function WatchWizard(props: WatchWizardProps = {}) {
+  const { targets: targetsProp, selectedTargetId, onSelectedTargetIdChange } = props;
+  const [fetchedTargets, setFetchedTargets] = useState<ServiceTargetRow[]>([]);
   const [email, setEmail] = useState("");
-  const [serviceTargetId, setServiceTargetId] = useState("");
+  const [localServiceTargetId, setLocalServiceTargetId] = useState("");
   const [allowed, setAllowed] = useState<number[]>([1, 2, 3, 4, 5]);
   const [morning, setMorning] = useState(true);
   const [afternoon, setAfternoon] = useState(true);
@@ -27,29 +36,42 @@ export function WatchWizard() {
   const [consentNotifications, setConsentNotifications] = useState(false);
   const [consentBrowser, setConsentBrowser] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [fetchTargetError, setFetchTargetError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const loading = useMemo(() => status === "loading", [status]);
 
+  const effectiveTargets = targetsProp ?? fetchedTargets;
+  const serviceTargetId = selectedTargetId ?? localServiceTargetId;
+  const setServiceTargetId = onSelectedTargetIdChange ?? setLocalServiceTargetId;
+
+  const displayError = actionError ?? (targetsProp === undefined ? fetchTargetError : null);
+
   useEffect(() => {
+    if (targetsProp !== undefined) return;
     void fetch("/api/service-targets")
       .then((r) => r.json())
-      .then((j: { targets?: Target[] }) => {
-        setTargets(j.targets ?? []);
-        if (j.targets?.[0]) setServiceTargetId(j.targets[0].id);
+      .then((j: { targets?: ServiceTargetRow[] }) => {
+        setFetchedTargets(j.targets ?? []);
+        setFetchTargetError(null);
+        if (j.targets?.[0] && selectedTargetId === undefined) setLocalServiceTargetId(j.targets[0].id);
       })
-      .catch(() => setError("Could not load campus list."));
-  }, []);
+      .catch(() => setFetchTargetError("Could not load campus list."));
+  }, [targetsProp, selectedTargetId]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    if (!serviceTargetId || effectiveTargets.length === 0) {
+      setActionError("Pick a VHS location with available data (seed the DB or reload).");
+      return;
+    }
+    setActionError(null);
     setStatus("loading");
     const res = await fetch("/api/watches", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email,
-        serviceTargetId,
+        serviceTargetId: serviceTargetId || undefined,
         allowedWeekdays: allowed,
         allowMorning: morning,
         allowAfternoon: afternoon,
@@ -62,7 +84,9 @@ export function WatchWizard() {
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       setStatus(null);
-      setError(typeof body?.errors === "object" ? JSON.stringify(body.errors) : body?.error ?? res.statusText);
+      setActionError(
+        typeof body?.errors === "object" ? JSON.stringify(body.errors) : body?.error ?? res.statusText,
+      );
       return;
     }
     setStatus("sent");
@@ -75,6 +99,8 @@ export function WatchWizard() {
   }
 
   const needsBrowser = mode === "browser_session" || mode === "browser_session_and_email";
+
+  const canPickCampus = effectiveTargets.length > 0;
 
   return (
     <form onSubmit={onSubmit} className="space-y-6 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
@@ -99,16 +125,21 @@ export function WatchWizard() {
       <label className="block text-sm">
         <span className="font-medium">VHS sub-location</span>
         <select
-          className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
-          value={serviceTargetId}
+          className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 disabled:opacity-60"
+          value={canPickCampus ? serviceTargetId : ""}
           onChange={(e) => setServiceTargetId(e.target.value)}
-          required
+          required={canPickCampus}
+          disabled={!canPickCampus}
         >
-          {targets.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.labelEn}
-            </option>
-          ))}
+          {!canPickCampus ? (
+            <option value="">No campuses loaded yet</option>
+          ) : (
+            effectiveTargets.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.labelEn}
+              </option>
+            ))
+          )}
         </select>
         <span className="mt-1 block text-xs text-zinc-500">
           Official booking entry:{" "}
@@ -199,7 +230,7 @@ export function WatchWizard() {
         </label>
       </div>
 
-      {error ? <p className="text-sm text-red-700 dark:text-red-300">{error}</p> : null}
+      {displayError ? <p className="text-sm text-red-700 dark:text-red-300">{displayError}</p> : null}
       {status === "sent" ? (
         <p className="text-sm text-emerald-800 dark:text-emerald-300">
           Check your inbox to confirm the watch. Until you confirm, no polling is active.
@@ -208,7 +239,7 @@ export function WatchWizard() {
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || !canPickCampus}
         className="rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-950"
       >
         {loading ? "Sending…" : "Create watch"}
