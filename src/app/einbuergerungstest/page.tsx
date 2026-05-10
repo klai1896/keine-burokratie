@@ -3,7 +3,7 @@ import { EinbuergerungstestPanel } from "@/components/EinbuergerungstestPanel";
 
 export default function EinbuergerungstestPage() {
   return (
-    <article className="space-y-8">
+    <article className="space-y-8 text-foreground">
       <div className="space-y-3">
         <h1 className="text-3xl font-semibold">Einbürgerungstest (Berlin)</h1>
       </div>
@@ -11,15 +11,18 @@ export default function EinbuergerungstestPage() {
       <EinbuergerungstestPanel
         intro={
           <>
-            <p>
-              The citizenship test is a separate appointment from your naturalisation application. Berlin hosts tests
-              at multiple <strong>VHS (Volkshochschule) locations</strong>. You typically book a registration
-              appointment first, pay the fee, then sit the test on another day.
+            <p className="text-muted-foreground">
+              The citizenship test is a separate appointment from your naturalisation application. Berlin hosts tests at
+              multiple <strong className="text-foreground">VHS (Volkshochschule) locations</strong>. You typically book a
+              registration appointment first, pay the fee, then sit the test on another day.
             </p>
-            <ul className="list-disc space-y-2 pl-5 text-sm">
+            <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
               <li>
                 Umbrella Service Berlin entry:{" "}
-                <a className="underline" href="https://service.berlin.de/dienstleistung/351180/">
+                <a
+                  className="font-medium text-primary underline decoration-primary/40"
+                  href="https://service.berlin.de/dienstleistung/351180/"
+                >
                   Einbürgerung — Zum Einbürgerungstest anmelden
                 </a>
               </li>
@@ -30,7 +33,7 @@ export default function EinbuergerungstestPage() {
         }
       />
 
-      <Link className="text-sm underline" href="/">
+      <Link className="text-sm font-medium text-primary underline decoration-primary/40" href="/">
         ← Journey hub
       </Link>
     </article>

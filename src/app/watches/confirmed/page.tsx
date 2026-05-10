@@ -54,15 +54,15 @@ function Inner() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-foreground">
       <h1 className="text-2xl font-semibold">Watch activated</h1>
-      <p className="text-sm text-zinc-700 dark:text-zinc-300">
+      <p className="text-sm text-muted-foreground">
         If you chose a “keep page open” mode, grant notification permission below and keep this tab
         open while you work. Email notifications still work if you close the tab (when enabled).
       </p>
 
       {!watchId || !manageToken ? (
-        <p className="text-sm text-amber-800 dark:text-amber-200">
+        <p className="text-sm font-medium text-destructive">
           Missing link parameters — open this page from your confirmation redirect or email manage link.
         </p>
       ) : (
@@ -70,21 +70,21 @@ function Inner() {
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
-              className="rounded border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700"
+              className="rounded-lg border border-border bg-card/80 px-3 py-2 text-sm font-medium text-foreground shadow-soft backdrop-blur-sm"
               onClick={() => void requestNotificationPermission()}
             >
               Request notification permission
             </button>
             <button
               type="button"
-              className="rounded border border-red-400 px-3 py-2 text-sm text-red-800 dark:border-red-700 dark:text-red-200"
+              className="rounded-lg border border-destructive/60 bg-destructive/10 px-3 py-2 text-sm font-semibold text-destructive"
               onClick={() => void cancel()}
             >
               Stop this watch
             </button>
           </div>
 
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-muted-foreground">
             SSE debug:{" "}
             {log.slice(-8).join(" · ") ||
               "listening — polling runs only Mon–Fri from 07:00 Berlin local time"}
@@ -92,7 +92,7 @@ function Inner() {
         </>
       )}
 
-      <Link className="text-sm underline" href="/">
+      <Link className="text-sm font-medium text-primary underline decoration-primary/40" href="/">
         ← Back home
       </Link>
     </div>
@@ -101,7 +101,7 @@ function Inner() {
 
 export default function ConfirmedPage() {
   return (
-    <Suspense fallback={<p className="text-sm text-zinc-600">Loading…</p>}>
+    <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
       <Inner />
     </Suspense>
   );

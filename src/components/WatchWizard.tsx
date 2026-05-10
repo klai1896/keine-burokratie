@@ -7,9 +7,8 @@ export type ServiceTargetRow = { id: string; labelEn: string; officialUrl: strin
 export type WatchWizardProps = {
   /** When set, skips loading `/api/service-targets` and uses these rows (e.g. parent already fetched). */
   targets?: ServiceTargetRow[];
-  /** Controlled selected `service_target` id; pair with `onSelectedTargetIdChange` from a parent picker. */
-  selectedTargetId?: string;
-  onSelectedTargetIdChange?: (id: string) => void;
+  selectedTargetIds: string[];
+  onSelectedTargetIdsChange: (ids: string[]) => void;
 };
 
 const weekdayDefs: { value: number; label: string }[] = [
@@ -21,11 +20,10 @@ const weekdayDefs: { value: number; label: string }[] = [
   { value: 6, label: "Saturday" },
 ];
 
-export function WatchWizard(props: WatchWizardProps = {}) {
-  const { targets: targetsProp, selectedTargetId, onSelectedTargetIdChange } = props;
+export function WatchWizard(props: WatchWizardProps) {
+  const { targets: targetsProp, selectedTargetIds, onSelectedTargetIdsChange } = props;
   const [fetchedTargets, setFetchedTargets] = useState<ServiceTargetRow[]>([]);
   const [email, setEmail] = useState("");
-  const [localServiceTargetId, setLocalServiceTargetId] = useState("");
   const [allowed, setAllowed] = useState<number[]>([1, 2, 3, 4, 5]);
   const [morning, setMorning] = useState(true);
   const [afternoon, setAfternoon] = useState(true);
@@ -41,10 +39,6 @@ export function WatchWizard(props: WatchWizardProps = {}) {
   const loading = useMemo(() => status === "loading", [status]);
 
   const effectiveTargets = targetsProp ?? fetchedTargets;
-  const serviceTargetId = selectedTargetId ?? localServiceTargetId;
-  const setServiceTargetId = onSelectedTargetIdChange ?? setLocalServiceTargetId;
-
-  const displayError = actionError ?? (targetsProp === undefined ? fetchTargetError : null);
 
   useEffect(() => {
     if (targetsProp !== undefined) return;
@@ -53,15 +47,14 @@ export function WatchWizard(props: WatchWizardProps = {}) {
       .then((j: { targets?: ServiceTargetRow[] }) => {
         setFetchedTargets(j.targets ?? []);
         setFetchTargetError(null);
-        if (j.targets?.[0] && selectedTargetId === undefined) setLocalServiceTargetId(j.targets[0].id);
       })
       .catch(() => setFetchTargetError("Could not load campus list."));
-  }, [targetsProp, selectedTargetId]);
+  }, [targetsProp]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!serviceTargetId || effectiveTargets.length === 0) {
-      setActionError("Pick a VHS location with available data (seed the DB or reload).");
+    if (selectedTargetIds.length === 0 || effectiveTargets.length === 0) {
+      setActionError("Pick at least one VHS location with available data (seed the DB or reload).");
       return;
     }
     setActionError(null);
@@ -71,7 +64,7 @@ export function WatchWizard(props: WatchWizardProps = {}) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email,
-        serviceTargetId: serviceTargetId || undefined,
+        serviceTargetIds: selectedTargetIds,
         allowedWeekdays: allowed,
         allowMorning: morning,
         allowAfternoon: afternoon,
@@ -98,22 +91,37 @@ export function WatchWizard(props: WatchWizardProps = {}) {
     );
   }
 
+  function toggleLocation(id: string) {
+    onSelectedTargetIdsChange(
+      selectedTargetIds.includes(id)
+        ? selectedTargetIds.filter((x) => x !== id).length > 0
+          ? selectedTargetIds.filter((x) => x !== id)
+          : selectedTargetIds
+        : [...selectedTargetIds, id],
+    );
+  }
+
   const needsBrowser = mode === "browser_session" || mode === "browser_session_and_email";
 
   const canPickCampus = effectiveTargets.length > 0;
 
+  const displayError = actionError ?? (targetsProp === undefined ? fetchTargetError : null);
+
   return (
-    <form onSubmit={onSubmit} className="space-y-6 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-      <p className="text-sm text-zinc-700 dark:text-zinc-300">
-        Start with your email, then pick a VHS location and the days and time bands that match the
-        official “Wunschtage / Vor- & Nachmittags” step. We only poll on Berlin workdays Monday–Friday from
-        07:00 (local time), per product spec.
+    <form
+      onSubmit={onSubmit}
+      className="space-y-6 rounded-xl border border-border bg-card/90 p-4 text-card-foreground shadow-soft backdrop-blur-sm"
+    >
+      <p className="text-sm text-muted-foreground">
+        Start with your email, then choose <strong className="text-foreground">one or more</strong> VHS locations and
+        the days and time bands that match the official “Wunschtage / Vor- & Nachmittags” step. We poll on Berlin
+        workdays Monday–Friday from <strong className="text-foreground">07:00 (local time)</strong>, per product spec.
       </p>
 
       <label className="block text-sm">
         <span className="font-medium">Email</span>
         <input
-          className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+          className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
           type="email"
           required
           value={email}
@@ -122,32 +130,49 @@ export function WatchWizard(props: WatchWizardProps = {}) {
         />
       </label>
 
-      <label className="block text-sm">
-        <span className="font-medium">VHS sub-location</span>
-        <select
-          className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 disabled:opacity-60"
-          value={canPickCampus ? serviceTargetId : ""}
-          onChange={(e) => setServiceTargetId(e.target.value)}
-          required={canPickCampus}
-          disabled={!canPickCampus}
-        >
-          {!canPickCampus ? (
-            <option value="">No campuses loaded yet</option>
-          ) : (
-            effectiveTargets.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.labelEn}
-              </option>
-            ))
-          )}
-        </select>
-        <span className="mt-1 block text-xs text-zinc-500">
-          Official booking entry:{" "}
-          <a className="underline" href="https://service.berlin.de/dienstleistung/351180/">
+      <fieldset className="space-y-2 text-sm" disabled={!canPickCampus}>
+        <legend className="font-medium">VHS sub-locations</legend>
+        <p className="text-muted-foreground">
+          Multi-select campuses you are willing to travel to — we notify you when any of them matches your preferences.
+        </p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {effectiveTargets.map((t) => (
+            <label
+              key={t.id}
+              className={`flex cursor-pointer gap-2 rounded-lg border px-3 py-2 transition ${
+                selectedTargetIds.includes(t.id)
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-primary/35"
+              }`}
+            >
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={selectedTargetIds.includes(t.id)}
+                onChange={() => toggleLocation(t.id)}
+              />
+              <span>
+                <span className="block font-medium text-foreground">{t.labelEn}</span>
+                <a
+                  className="text-xs font-medium text-primary underline decoration-primary/45"
+                  href={t.officialUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Open booking on Service Berlin →
+                </a>
+              </span>
+            </label>
+          ))}
+        </div>
+        <span className="block text-xs text-muted-foreground">
+          Official umbrella:{" "}
+          <a className="font-medium text-primary underline decoration-primary/40" href="https://service.berlin.de/dienstleistung/351180/">
             Service Berlin — Einbürgerungstest
           </a>
         </span>
-      </label>
+      </fieldset>
 
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">Requested weekdays (Monday–Saturday)</legend>
@@ -224,13 +249,12 @@ export function WatchWizard(props: WatchWizardProps = {}) {
             onChange={(e) => setConsentBrowser(e.target.checked)}
           />
           <span>
-            I consent to device notifications for this browser session (only required for “keep page
-            open” modes).
+            I consent to device notifications for this browser session (only required for “keep page open” modes).
           </span>
         </label>
       </div>
 
-      {displayError ? <p className="text-sm text-red-700 dark:text-red-300">{displayError}</p> : null}
+      {displayError ? <p className="text-sm text-destructive">{displayError}</p> : null}
       {status === "sent" ? (
         <p className="text-sm text-emerald-800 dark:text-emerald-300">
           Check your inbox to confirm the watch. Until you confirm, no polling is active.
@@ -239,8 +263,8 @@ export function WatchWizard(props: WatchWizardProps = {}) {
 
       <button
         type="submit"
-        disabled={loading || !canPickCampus}
-        className="rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-950"
+        disabled={loading || !canPickCampus || selectedTargetIds.length === 0}
+        className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft transition hover:opacity-95 disabled:pointer-events-none disabled:opacity-50"
       >
         {loading ? "Sending…" : "Create watch"}
       </button>

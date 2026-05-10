@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
-import { serviceTarget, watch } from "@/db/schema";
+import { serviceTarget, watch, watchLocation } from "@/db/schema";
 import { sendTransactionalEmail } from "@/lib/mail";
 import { publicAppUrl } from "@/lib/app-url";
 import { hashEmailForDedupe, normalizeEmail } from "@/lib/email-hash";
@@ -22,34 +22,45 @@ export async function POST(req: Request) {
   }
   const v = parsed.value;
 
-  const target = await db
+  const targetRows = await db
     .select()
     .from(serviceTarget)
-    .where(eq(serviceTarget.id, v.serviceTargetId))
-    .limit(1);
+    .where(and(inArray(serviceTarget.id, v.serviceTargetIds), eq(serviceTarget.active, true)));
 
-  if (!target[0]?.active) {
-    return NextResponse.json({ error: "Unknown or inactive service target" }, { status: 400 });
+  if (targetRows.length !== v.serviceTargetIds.length) {
+    return NextResponse.json({ error: "Unknown or inactive service target in selection" }, { status: 400 });
   }
 
   const confirmToken = generateToken();
   const manageToken = generateToken();
 
-  const [created] = await db
-    .insert(watch)
-    .values({
-      email: normalizeEmail(v.email),
-      emailHash: hashEmailForDedupe(v.email),
-      serviceTargetId: v.serviceTargetId,
-      allowedWeekdays: v.allowedWeekdays,
-      allowMorning: v.allowMorning,
-      allowAfternoon: v.allowAfternoon,
-      notificationMode: v.notificationMode,
-      status: "pending_confirm",
-      confirmTokenHash: hashToken(confirmToken),
-      manageTokenHash: hashToken(manageToken),
-    })
-    .returning({ id: watch.id });
+  const created = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(watch)
+      .values({
+        email: normalizeEmail(v.email),
+        emailHash: hashEmailForDedupe(v.email),
+        allowedWeekdays: v.allowedWeekdays,
+        allowMorning: v.allowMorning,
+        allowAfternoon: v.allowAfternoon,
+        notificationMode: v.notificationMode,
+        status: "pending_confirm",
+        confirmTokenHash: hashToken(confirmToken),
+        manageTokenHash: hashToken(manageToken),
+      })
+      .returning({ id: watch.id });
+
+    if (!row) throw new Error("watch insert failed");
+
+    await tx.insert(watchLocation).values(
+      v.serviceTargetIds.map((serviceTargetId) => ({
+        watchId: row.id,
+        serviceTargetId,
+      })),
+    );
+
+    return row;
+  });
 
   const base = publicAppUrl();
   const confirmUrl = `${base}/api/watches/confirm?token=${encodeURIComponent(confirmToken)}`;

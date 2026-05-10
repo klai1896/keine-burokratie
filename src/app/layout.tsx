@@ -1,17 +1,16 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Fraunces, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
-import { SiteFooter } from "@/components/SiteFooter";
-import { SiteHeader } from "@/components/SiteHeader";
+import { AppShellLayout } from "@/components/AppShellLayout";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const fontSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
+  variable: "--font-app-sans",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const fontDisplay = Fraunces({
   subsets: ["latin"],
+  variable: "--font-app-display",
 });
 
 export const metadata: Metadata = {
@@ -26,14 +25,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
-        <SiteHeader />
-        <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-10">{children}</main>
-        <SiteFooter />
+    <html lang="en" className={`${fontSans.variable} ${fontDisplay.variable} h-full antialiased`}>
+      <body className="min-h-full">
+        <AppShellLayout>{children}</AppShellLayout>
       </body>
     </html>
   );

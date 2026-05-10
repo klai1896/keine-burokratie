@@ -8,6 +8,7 @@ import {
   serviceTarget,
   serviceTargetPollState,
   watch,
+  watchLocation,
   workerHeartbeat,
 } from "../db/schema";
 import { isBerlinPollWindowActive, nextBerlinWindowStart, berlinNow } from "../lib/berlin";
@@ -16,6 +17,7 @@ import type { AvailabilityPayload, NormalizedSlot } from "../lib/slots";
 import { newSlotsSince, slotMatchesWatch, canonicalSlotKey } from "../lib/slots";
 import { sendTransactionalEmail } from "../lib/mail";
 import { publicAppUrl } from "../lib/app-url";
+import { deliverPrReminderDigest } from "../lib/pr-checklist-reminders";
 
 const MIN_POLL_SEC = Number(process.env.MIN_POLL_INTERVAL_SEC ?? 60);
 const JITTER_MAX_MS = 15_000;
@@ -146,23 +148,24 @@ async function processTarget(targetId: string, targetUrl: string) {
   const currentSlots = payload.slots;
   const fresh = newSlotsSince(previousSlots, currentSlots);
 
-  const activeWatches = await db
-    .select()
-    .from(watch)
-    .where(and(eq(watch.serviceTargetId, targetId), eq(watch.status, "active")));
+  const watcherRows = await db
+    .select({ w: watch, wl: watchLocation })
+    .from(watchLocation)
+    .innerJoin(watch, eq(watchLocation.watchId, watch.id))
+    .where(and(eq(watchLocation.serviceTargetId, targetId), eq(watch.status, "active")));
 
   const base = publicAppUrl();
 
-  for (const w of activeWatches) {
-    if (!w.baselineSnapshotId) {
+  for (const { w, wl } of watcherRows) {
+    if (!wl.baselineSnapshotId) {
       await db
-        .update(watch)
+        .update(watchLocation)
         .set({ baselineSnapshotId: inserted.id })
-        .where(eq(watch.id, w.id));
+        .where(and(eq(watchLocation.watchId, w.id), eq(watchLocation.serviceTargetId, targetId)));
       continue;
     }
 
-    const baselineSlots = await loadSlotsForSnapshot(w.baselineSnapshotId);
+    const baselineSlots = await loadSlotsForSnapshot(wl.baselineSnapshotId);
     const baselineKeys = new Set(baselineSlots.map(canonicalSlotKey));
 
     const matched = fresh.filter(
@@ -211,10 +214,7 @@ async function processTarget(targetId: string, targetUrl: string) {
       });
     }
 
-    await db
-      .update(watch)
-      .set({ lastNotifiedAt: new Date() })
-      .where(eq(watch.id, w.id));
+    await db.update(watch).set({ lastNotifiedAt: new Date() }).where(eq(watch.id, w.id));
   }
 
   const nextPoll = new Date(Date.now() + backoffSec * 1000 + jitterMs());
@@ -233,6 +233,12 @@ export async function runTick() {
   const targets = await db.select().from(serviceTarget).where(eq(serviceTarget.active, true));
   for (const t of targets) {
     await processTarget(t.id, t.serviceBerlinUrl);
+  }
+
+  try {
+    await deliverPrReminderDigest();
+  } catch (e) {
+    console.warn("[worker] PR reminder digest error", e);
   }
 }
 

@@ -9,26 +9,68 @@ English-only UI · modular monolith (Next.js + PostgreSQL + poll worker).
 ## Prerequisites
 
 - Node 20+
-- Postgres 16+ (Docker Compose file included)
+- PostgreSQL **listening on the host/port in your `DATABASE_URL`** (often `localhost:5432`)
 
-## Quick start
+Docker is optional; [`docker-compose.yml`](docker-compose.yml) is only one way to run Postgres.
+
+### Quick start (Docker Compose)
+
+Requires [Docker Desktop](https://docs.docker.com/desktop/) or another CLI that provides `docker`.
 
 ```bash
 cp .env.example .env
-docker compose up -d   # if Docker is available
+docker compose up -d
 npm install
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/keine_burokratie npm run db:push
+npm run db:push
 npm run db:seed
 npm run dev
 ```
 
-In another terminal (after the schema exists):
+### Quick start without Docker (macOS examples)
+
+Your errors (`docker: command not found`, `ECONNREFUSED` on port 5432) mean **PostgreSQL is not running** locally and/or **`DATABASE_URL` does not match** your actual user, password, and database name.
+
+**Option A — Homebrew**
 
 ```bash
-npm run worker
+brew install postgresql@16
+brew services start postgresql@16
+# Create DB (superuser here is usually your macOS username unless you configured otherwise)
+createdb keine_burokratie
 ```
 
-Visit `http://localhost:3000`.
+Put a matching URL in `.env`, for example if your OS user is `you` with no password on the socket/default:
+
+```env
+DATABASE_URL=postgresql://you@localhost:5432/keine_burokratie
+```
+
+**Option B — [Postgres.app](https://postgresapp.com/)**
+
+Start the app (server on `localhost:5432`), create a database named `keine_burokratie`, and set `DATABASE_URL` to match the username shown in Postgres.app’s docs.
+
+Then:
+
+```bash
+cp .env.example .env   # edit DATABASE_URL inside
+npm install
+npm run db:push
+npm run db:seed
+npm run dev
+npm run ingest:exams    # optional, after Postgres is up
+```
+
+### Troubleshooting `ECONNREFUSED`
+
+| Symptom | Meaning |
+|---------|--------|
+| `connect ECONNREFUSED … :5432` | No Postgres daemon on that host/port → start Postgres or fix the port in `DATABASE_URL`. |
+| `docker: command not found` | Compose path won’t work until you install Docker or use Brew/Postgres.app instead (see above). |
+| Seed/ingest fail but `npm run db:push` seemed fine | `.env` may be ignored by some tools; prefix commands with `DATABASE_URL=…` explicitly to match the DB you actually started. |
+
+After `db:seed`, run **`npm run worker`** in another terminal if you want the poll loop; visit **`http://localhost:3000`**.
+
+Using Docker Compose, the URL in `.env.example` (`postgres` / `postgres` / DB `keine_burokratie`) matches [`docker-compose.yml`](docker-compose.yml).
 
 ## Scripts
 
@@ -36,7 +78,7 @@ Visit `http://localhost:3000`.
 |--------|---------|
 | `npm run dev` | Next.js dev server |
 | `npm run build` / `npm start` | Production build & serve |
-| `npm run worker` | Mon–Fri ≥07:00 Berlin poll worker (singleton per `service_target`) |
+| `npm run worker` | Mon–Fri ≥07:00 Berlin poll worker + daily PR checklist reminder digests (needs `RESEND_API_KEY` for email) |
 | `npm run db:push` | Push Drizzle schema to Postgres |
 | `npm run db:seed` | Seed ≥12 Einbürgerungstest `service_target` rows + ≥8 `exam_listing` rows |
 | `npm run ingest:exams` | Stub ingest that pings Goethe URLs and bumps `last_verified` |

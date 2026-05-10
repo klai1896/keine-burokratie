@@ -11,7 +11,7 @@ type Props = {
 
 export function EinbuergerungstestPanel({ intro, compactIntro }: Props) {
   const [targets, setTargets] = useState<ServiceTargetRow[]>([]);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -27,12 +27,16 @@ export function EinbuergerungstestPanel({ intro, compactIntro }: Props) {
         const list = j.targets ?? [];
         setTargets(list);
         setLoadError(null);
-        setSelectedId((prev) => (prev ? prev : list[0]?.id ?? ""));
+        setSelectedIds((prev) => {
+          const keep = prev.filter((id) => list.some((t) => t.id === id));
+          if (keep.length > 0) return keep;
+          return list[0]?.id ? [list[0].id] : [];
+        });
       })
       .catch(() => {
         if (cancelled) return;
         setLoadError(
-          "Could not load VHS locations. Start Postgres (`docker compose up -d`), run `DATABASE_URL=… npm run db:push` and `npm run db:seed`, then refresh.",
+          "Could not load VHS locations. Start Postgres, run `npm run db:push` and `npm run db:seed`, then refresh.",
         );
         setTargets([]);
       })
@@ -44,30 +48,38 @@ export function EinbuergerungstestPanel({ intro, compactIntro }: Props) {
     };
   }, []);
 
+  function toggleLocation(id: string) {
+    setSelectedIds((prev) => {
+      if (prev.includes(id)) {
+        const next = prev.filter((x) => x !== id);
+        return next.length > 0 ? next : prev;
+      }
+      return [...prev, id];
+    });
+  }
+
   const mainServiceUrl = "https://service.berlin.de/dienstleistung/351180/";
 
   return (
     <div className="space-y-8">
-      {intro ? <div className="space-y-3 text-zinc-700 dark:text-zinc-300">{intro}</div> : null}
+      {intro ? <div className="space-y-3 text-muted-foreground">{intro}</div> : null}
 
-      {compactIntro ? <div className="text-sm text-zinc-700 dark:text-zinc-300">{compactIntro}</div> : null}
+      {compactIntro ? <div className="text-sm text-muted-foreground">{compactIntro}</div> : null}
 
-      <section className="space-y-3 rounded-lg border border-zinc-200 bg-zinc-50/70 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
-        <h2 className="text-lg font-semibold">Choose a Berlin VHS test location</h2>
-        <p className="text-sm text-zinc-700 dark:text-zinc-300">
-          Pick where you plan to register. Links open{" "}
-          <a className="underline" href={mainServiceUrl}>
+      <section className="space-y-3 rounded-xl border border-border bg-card/70 p-4 text-card-foreground shadow-soft backdrop-blur-sm">
+        <h2 className="text-lg font-semibold text-foreground">Choose Berlin VHS test locations</h2>
+        <p className="text-sm text-muted-foreground">
+          Select <strong className="text-foreground">every campus</strong> where you might book. Links open{" "}
+          <a className="font-medium text-primary underline decoration-primary/40" href={mainServiceUrl}>
             Service Berlin’s Einbürgerungstest flow
           </a>{" "}
-          filtered to each sub-location — you complete payment and booking yourself on the official site.
+          filtered to each sub-location — you complete payment yourself on the official site.
         </p>
 
-        {loadError ? <p className="text-sm text-red-700 dark:text-red-300">{loadError}</p> : null}
-        {!loadError && loading ? (
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">Loading campus list…</p>
-        ) : null}
+        {loadError ? <p className="text-sm text-destructive">{loadError}</p> : null}
+        {!loadError && loading ? <p className="text-sm text-muted-foreground">Loading campus list…</p> : null}
         {!loadError && !loading && targets.length === 0 ? (
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="text-sm text-muted-foreground">
             No campuses found. Confirm the seed script created `service_target` rows for Einbürgerungstest.
           </p>
         ) : null}
@@ -75,27 +87,38 @@ export function EinbuergerungstestPanel({ intro, compactIntro }: Props) {
         {!loadError && !loading && targets.length > 0 ? (
           <ul className="grid gap-3 sm:grid-cols-2">
             {targets.map((t) => {
-              const active = selectedId === t.id;
+              const active = selectedIds.includes(t.id);
               return (
                 <li key={t.id}>
                   <button
                     type="button"
-                    onClick={() => setSelectedId(t.id)}
-                    className={`h-full w-full rounded-lg border p-4 text-left text-sm shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500 ${active ? "border-zinc-900 ring-2 ring-zinc-900 dark:border-zinc-100 dark:ring-zinc-200" : "border-zinc-200 bg-white hover:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-600"}`}
+                    onClick={() => toggleLocation(t.id)}
+                    aria-pressed={active}
+                    className={`h-full w-full rounded-xl border p-4 text-left text-sm shadow-soft transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "border-primary ring-2 ring-primary/35" : "border-border bg-card/90 hover:border-primary/35"}`}
                   >
-                    <span className="block font-medium text-zinc-900 dark:text-zinc-50">{t.labelEn}</span>
-                    <span className="mt-2 block text-xs text-zinc-600 dark:text-zinc-400">
-                      Selected here also updates the watcher below so notifications match this campus.
+                    <span className="flex items-start gap-3">
+                      <span
+                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs font-semibold ${active ? "border-primary bg-primary text-primary-foreground" : "border-border"}`}
+                        aria-hidden
+                      >
+                        {active ? "✓" : ""}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block font-medium text-foreground">{t.labelEn}</span>
+                        <span className="mt-2 block text-xs text-muted-foreground">
+                          Toggle multiple campuses; selections feed the watcher below.
+                        </span>
+                        <a
+                          className="mt-3 inline-block text-xs font-medium text-primary underline decoration-primary/45"
+                          href={t.officialUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Open booking on Service Berlin →
+                        </a>
+                      </span>
                     </span>
-                    <a
-                      className="mt-3 inline-block text-xs font-medium text-emerald-800 underline decoration-emerald-800/70 dark:text-emerald-300 dark:decoration-emerald-300/70"
-                      href={t.officialUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      Open booking on Service Berlin →
-                    </a>
                   </button>
                 </li>
               );
@@ -105,14 +128,15 @@ export function EinbuergerungstestPanel({ intro, compactIntro }: Props) {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Optional slot watch (MVP)</h2>
-        <p className="text-sm text-zinc-700 dark:text-zinc-300">
-          We poll <strong>only</strong> on Berlin weekdays (Mon–Fri) from{" "}
-          <strong>07:00 Europe/Berlin</strong>. You receive email and/or desktop notifications — you still confirm
-          the appointment yourself on Service Berlin.
+        <h2 className="text-lg font-semibold text-foreground">Optional slot watch (MVP)</h2>
+        <p className="text-sm text-muted-foreground">
+          We poll <strong className="text-foreground">only</strong> on Berlin weekdays (Mon–Fri) from{" "}
+          <strong className="text-foreground">07:00 Europe/Berlin</strong>. You receive email and/or desktop
+          notifications — you still confirm the appointment yourself on Service Berlin (any campus you opted into may
+          match).
         </p>
         {!loadError ? (
-          <WatchWizard targets={targets} selectedTargetId={selectedId} onSelectedTargetIdChange={setSelectedId} />
+          <WatchWizard targets={targets} selectedTargetIds={selectedIds} onSelectedTargetIdsChange={setSelectedIds} />
         ) : null}
       </section>
     </div>

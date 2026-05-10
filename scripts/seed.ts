@@ -19,6 +19,12 @@ const targets: { slug: string; labelEn: string; suffix: string }[] = [
   { slug: "vhs-treptow-koepenick", labelEn: "VHS Treptow-Köpenick", suffix: "" },
 ];
 
+/** Goethe Berlin exam pages use the `de/de` tree; older `en` paths often break or redirect unpredictably. */
+const GOETHE_BERLIN_A1 = "https://www.goethe.de/ins/de/de/prf/ort/ber/gza1.cfm";
+const GOETHE_BERLIN_B1 = "https://www.goethe.de/ins/de/de/prf/ort/ber/gzb1.cfm";
+/** telc official centre finder (confirmed live). Prefer searching Germany + Berlin area postal code. */
+const TELC_EXAMINATION_FINDER = "https://www.telc.net/en/language-examinations/find-a-telc-examination-centre/";
+
 const examRows = [
   {
     slug: "goethe-berlin-a1",
@@ -27,9 +33,9 @@ const examRows = [
     examSystem: "goethe" as const,
     levels: ["A1"],
     priceDisplay: "See booking page",
-    availableDatesDisplay: "Varies — confirm on provider",
-    bookingUrl: "https://www.goethe.de/ins/de/en/prf/ort/ber/gza1.cfm",
-    sourcePageUrl: "https://www.goethe.de/ins/de/en/prf/ort/ber/gza1.cfm",
+    availableDatesDisplay: "Run npm run ingest:exams for the next bookable Berlin date.",
+    bookingUrl: GOETHE_BERLIN_A1,
+    sourcePageUrl: GOETHE_BERLIN_A1,
   },
   {
     slug: "goethe-berlin-b1",
@@ -38,9 +44,9 @@ const examRows = [
     examSystem: "goethe" as const,
     levels: ["B1"],
     priceDisplay: "See booking page",
-    availableDatesDisplay: "Varies — confirm on provider",
-    bookingUrl: "https://www.goethe.de/ins/de/en/prf/ort/ber/gzb1.cfm",
-    sourcePageUrl: "https://www.goethe.de/ins/de/en/prf/ort/ber/gzb1.cfm",
+    availableDatesDisplay: "Run npm run ingest:exams for the next bookable Berlin date.",
+    bookingUrl: GOETHE_BERLIN_B1,
+    sourcePageUrl: GOETHE_BERLIN_B1,
   },
   {
     slug: "telc-ber-alpha-a1-sample",
@@ -49,9 +55,9 @@ const examRows = [
     examSystem: "telc" as const,
     levels: ["A1"],
     priceDisplay: "See institution page",
-    availableDatesDisplay: "Use telc finder + provider",
-    bookingUrl: "https://www.telc.net/en/language-examinations/find-a-telc-examination-centre/",
-    sourcePageUrl: "https://www.telc.net/en/language-examinations/find-a-telc-examination-centre/",
+    availableDatesDisplay: "Search Germany + Berlin postcode in telc finder",
+    bookingUrl: TELC_EXAMINATION_FINDER,
+    sourcePageUrl: TELC_EXAMINATION_FINDER,
   },
   {
     slug: "telc-ber-beta-b1-sample",
@@ -60,9 +66,9 @@ const examRows = [
     examSystem: "telc" as const,
     levels: ["B1"],
     priceDisplay: "See institution page",
-    availableDatesDisplay: "Use telc finder + provider",
-    bookingUrl: "https://www.telc.net/en/language-examinations/find-a-telc-examination-centre/",
-    sourcePageUrl: "https://www.telc.net/en/language-examinations/find-a-telc-examination-centre/",
+    availableDatesDisplay: "Search Germany + Berlin postcode in telc finder",
+    bookingUrl: TELC_EXAMINATION_FINDER,
+    sourcePageUrl: TELC_EXAMINATION_FINDER,
   },
   {
     slug: "goethe-ber-a1-alt",
@@ -71,9 +77,9 @@ const examRows = [
     examSystem: "goethe" as const,
     levels: ["A1"],
     priceDisplay: "See booking page",
-    availableDatesDisplay: "Varies",
-    bookingUrl: "https://www.goethe.de/ins/de/en/prf/ort/ber/gza1.cfm",
-    sourcePageUrl: "https://www.goethe.de/ins/de/en/prf/ort/ber/gza1.cfm",
+    availableDatesDisplay: "Same as Goethe Berlin A1 — run ingest:exams.",
+    bookingUrl: GOETHE_BERLIN_A1,
+    sourcePageUrl: GOETHE_BERLIN_A1,
   },
   {
     slug: "telc-ber-gamma-a1b1",
@@ -83,8 +89,8 @@ const examRows = [
     levels: ["A1", "B1"],
     priceDisplay: "See institution page",
     availableDatesDisplay: "Varies",
-    bookingUrl: "https://www.telc.net/en/language-examinations/find-a-telc-examination-centre/",
-    sourcePageUrl: "https://www.telc.net/en/language-examinations/find-a-telc-examination-centre/",
+    bookingUrl: TELC_EXAMINATION_FINDER,
+    sourcePageUrl: TELC_EXAMINATION_FINDER,
   },
   {
     slug: "goethe-ber-b1-practice",
@@ -93,9 +99,9 @@ const examRows = [
     examSystem: "goethe" as const,
     levels: ["B1"],
     priceDisplay: "See booking page",
-    availableDatesDisplay: "Varies",
-    bookingUrl: "https://www.goethe.de/ins/de/en/m/prf/ort/ber.html",
-    sourcePageUrl: "https://www.goethe.de/ins/de/en/m/prf/ort/ber.html",
+    availableDatesDisplay: "Same as Goethe Berlin B1 — run ingest:exams.",
+    bookingUrl: GOETHE_BERLIN_B1,
+    sourcePageUrl: GOETHE_BERLIN_B1,
   },
   {
     slug: "telc-ber-delta-a1",
@@ -105,8 +111,8 @@ const examRows = [
     levels: ["A1"],
     priceDisplay: "See institution page",
     availableDatesDisplay: "Varies",
-    bookingUrl: "https://www.telc.net/en/language-examinations/find-a-telc-examination-centre/",
-    sourcePageUrl: "https://www.telc.net/en/language-examinations/find-a-telc-examination-centre/",
+    bookingUrl: TELC_EXAMINATION_FINDER,
+    sourcePageUrl: TELC_EXAMINATION_FINDER,
   },
 ];
 

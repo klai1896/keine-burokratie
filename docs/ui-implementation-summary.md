@@ -2,7 +2,7 @@
 
 **Purpose:** Hand this document to a designer or another AI to describe **how the product is built today** (layout, colours, typography patterns, key flows). It is **not** a spec for how the UI *should* look—only a factual snapshot of the current implementation.
 
-**Codebase:** Next.js 16 (App Router), React 19, **Tailwind CSS v4** (`@import "tailwindcss"` in `src/app/globals.css`). No separate component library (no shadcn/Chakra). **English-only** UI copy.
+**Codebase:** Next.js 16 (App Router), React 19, **Tailwind CSS v4** (`@import "tailwindcss"` in `src/app/globals.css`). **English-only** UI copy. No Radix/shadcn dependency—layout is custom flex + client drawer.
 
 ---
 
@@ -11,12 +11,13 @@
 | Element | Implementation |
 |--------|----------------|
 | Document language | `lang="en"` on `<html>` (`src/app/layout.tsx`). |
-| Root layout | Vertical flex column: header → **main** (grows) → footer. `<html>` has `h-full`; `<body>` has `min-h-full flex flex-col`. |
-| `<body>` surfaces | Light: `bg-zinc-50 text-zinc-950`. Dark: `dark:bg-zinc-950 dark:text-zinc-50`. Uses **Tailwind `dark:` variants** tied to **prefers-color-scheme** (no manual theme toggle). |
-| Main column | `mx-auto max-w-3xl w-full px-4 py-10 flex flex-col flex-1` — content is **narrow** (~768px max), centred, vertical rhythm only via component spacing. |
+| App chrome | **`AppShellLayout`** (`src/components/AppShellLayout.tsx`): **desktop sidebar** (`md+`) + **main column** with **`bg-gradient-hero`**, sticky **subheader** (mobile menu trigger, tagline, Service Berlin pill). |
+| Mobile nav | **`SidebarNav`** / **`MobileSidebarDrawer`** (`src/components/SidebarNav.tsx`): hamburger opens full-height sheet with the same links as the desktop rail. |
+| Main content | Centered **`max-w-3xl`** column with horizontal padding inside the gradient column; **footer** anchored to bottom of that column. |
+| Dark mode | **System** via `@media (prefers-color-scheme: dark)` overrides on `:root` in `globals.css` (OKLCH tokens). No manual light/dark toggle. |
 | Antialiasing | `antialiased` on `<html>`. |
 
-**Implication:** The experience is a **single-column reading layout** with no sidebar, no app chrome beyond the top nav, and no max-width variants per route.
+**Implication:** Two-column “product” feel on desktop (nav + content); single column with overlay nav on small screens.
 
 ---
 
@@ -24,183 +25,115 @@
 
 | Piece | Details |
 |-------|---------|
-| Loaded fonts (Next.js) | **Geist Sans** and **Geist Mono** from `next/font/google`, applied as CSS variables on `<html>`: `--font-geist-sans`, `--font-geist-mono` (`src/app/layout.tsx`). |
-| Tailwind theme hook | `globals.css` defines `@theme inline` with `--font-sans: var(--font-geist-sans)` and `--font-mono: var(--font-geist-mono)`. |
-| `globals.css` body rule | `body { font-family: Arial, Helvetica, sans-serif; }` is still present **alongside** Geist variables — depending on cascade and Tailwind preflight, **actual rendered body font may be Arial or Geist**; worth verifying in browser. |
+| Body / UI | **Plus Jakarta Sans** via `next/font/google`, CSS variable `--font-app-sans`, wired in `@theme` as `--font-sans` with fallback. |
+| Display / headings | **Fraunces** via `next/font/google`, variable `--font-app-display`, `@theme` `--font-display`; `globals.css` `@layer base` applies `font-display` to `h1–h3` and `.font-display`. |
 
-**Hierarchy (typical page patterns)**
+**Common text classes**
 
-- **Eyebrow / label:** `text-sm font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-400` (home hero only).
-- **Page H1:** `text-3xl font-semibold` (most articles) or `text-4xl font-semibold tracking-tight` (home).
-- **Lead paragraph:** `text-lg text-zinc-700 dark:text-zinc-300` (home).
-- **Section H2:** `text-xl font-semibold` (some pages) or `text-lg font-semibold` (cards, panels).
-- **Body:** `text-sm` or default with `text-zinc-700 dark:text-zinc-300` for secondary paragraphs.
-- **Muted / legal:** `text-sm text-zinc-600 dark:text-zinc-400` or `text-xs text-zinc-500`.
-- **Strong emphasis:** `<strong>` in copy; occasional `font-medium` on labels.
-
-No custom type scale file—everything is **inline Tailwind classes**.
+- **Primary text:** `text-foreground`
+- **Secondary / supporting:** `text-muted-foreground`
+- **Taglines on journey pages:** `text-lg text-primary` (coral primary)
 
 ---
 
-## 3. Colour system (as implemented)
+## 3. Colour & token system (`src/app/globals.css`)
 
-The UI is almost entirely **neutral “zinc”** with **emerald** for “go to official / primary outbound” affordances and **red / emerald** for feedback.
+Design tokens are **OKLCH CSS variables** on `:root`, remapped into Tailwind via `@theme inline` (`--color-background`, `--color-primary`, `--color-sidebar-*`, `--color-mint`, `--color-lavender`, …).
 
-### 3.1 Neutrals (Tailwind `zinc`)
+| Role | Token / notes |
+|------|----------------|
+| **Background / ink** | `background`, `foreground` — warm off-white + deep violet ink (light); dark theme shifts to deep purple shell. |
+| **Primary accent** | **Coral** `primary` / `primary-foreground` — buttons, links, active sidebar pill. |
+| **Secondary** | **Mint** tint `secondary` — e.g. Service Berlin chip in header. |
+| **Surfaces** | `card`, `muted`, `border`, `input`, `ring`; cards often `bg-card/80` + `border-border` + `shadow-soft`. |
+| **Playful accents** | `mint`, `lavender`, `sand`, `sun` — journey cards use **border accents** (`border-primary/35`, `border-mint/40`, `border-lavender/40`) and `bg-gradient-card`. |
+| **Sidebar chrome** | `sidebar`, `sidebar-primary`, `sidebar-accent`, etc. |
+| **Feedback** | `destructive`; success line in watcher uses **`text-mint-foreground`**. |
 
-- **Page background:** `zinc-50` (light) / `zinc-950` (dark body).
-- **Surfaces / cards:** `bg-white` with `border-zinc-200` (light); `dark:bg-zinc-900` or `dark:bg-zinc-950` with `dark:border-zinc-800`.
-- **Text:** Primary `zinc-950` / `zinc-50`; secondary `zinc-700` / `zinc-300`; tertiary `zinc-600` / `zinc-400`.
-- **Borders / dividers:** `border-zinc-200`, `border-zinc-100`, `dark:border-zinc-800`, `dark:border-zinc-900`.
-- **Subtle panels:** `bg-zinc-50/70`, `dark:bg-zinc-950/40`.
+**Gradient utilities**
 
-### 3.2 Accent — emerald
-
-Used for **positive / official-link emphasis** (not a full brand system):
-
-- Home “MVP tools” callout: `border-emerald-200 bg-emerald-50 text-emerald-950` + `dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-50`.
-- Outbound links in pathway lists and campus cards: `text-emerald-800 underline` + `dark:text-emerald-300` (sometimes with `decoration-*` opacity).
-
-### 3.3 Semantic feedback
-
-- **Errors:** `text-red-700 dark:text-red-300`.
-- **Success:** `text-emerald-800 dark:text-emerald-300` (e.g. watch confirmation message in `WatchWizard`).
-
-### 3.4 CSS variables in `:root`
-
-`globals.css` defines `--background` / `--foreground` (`#ffffff` / `#171717` light; dark mode media query flips to near-black / light gray). **These are wired into Tailwind `@theme`** as `--color-background` / `--color-foreground`, but **`layout.tsx` does not rely on them for the main shell** — the shell uses explicit `bg-zinc-*` classes. Potential **duplication or drift** between variables and Tailwind neutrals.
+- **`bg-gradient-hero`** — main content column backdrop (multi radial + linear).
+- **`bg-gradient-card`** — soft card wash.
+- **`shadow-soft`**, **`shadow-pop`** — elevation tokens.
 
 ---
 
-## 4. Header & footer
+## 4. Header, sidebar & footer
 
-### Header (`SiteHeader.tsx`)
+### Desktop sidebar
 
-- Sticky-ish bar aesthetic: `border-b border-zinc-200 bg-white/80 backdrop-blur` (`dark:border-zinc-800 dark:bg-zinc-950/80`).
-- Inner: `max-w-3xl mx-auto px-4 py-4`, flex row, space-between.
-- Logo/title: `text-lg font-semibold tracking-tight` → `/`.
-- Nav: `flex flex-wrap gap-3 text-sm text-zinc-700 dark:text-zinc-200`, links **`hover:underline` only** (no active route styling).
+- Width `w-64`, `bg-sidebar`, `border-sidebar-border`.
+- Brand block: **Fraunces** title “Keine Bürokratie”, eyebrow “English UI · non-official helper”.
+- **Journeys** + **MVP tools** sections; items from **`src/lib/journeys.ts`** (`journeyPath` maps `residence` → `/permanent-residence`).
+- Active route: **`bg-sidebar-primary text-sidebar-primary-foreground shadow-soft`**.
 
-Links: Registration, Permanent residence, Citizenship, **Test slots** (`/einbuergerungstest`), **A1 / B1** (`/exams`).
+### Sticky subheader (main column)
+
+- `h-14`, `border-border/50`, `bg-background/60`, `backdrop-blur-md`.
+- **Service Berlin ↗** pill: `bg-secondary text-secondary-foreground rounded-full`.
 
 ### Footer (`SiteFooter.tsx`)
 
-- `mt-auto border-t border-zinc-200 bg-zinc-50 py-10 text-sm text-zinc-700` (+ dark equivalents).
-- Disclaimers (non-government, verify on Berlin.de / Service Berlin); links to `/privacy`, `/imprint`.
-- Links: default `underline`.
+- `border-border`, `bg-background/80`, `text-muted-foreground`; primary-style underlines on links.
 
 ---
 
-## 5. Navigation & information architecture (routes)
+## 5. Navigation & routes
 
 | Route | Role |
 |-------|------|
-| `/` | Journey hub: three **equal cards** to Registration, Permanent residence, Citizenship; green “MVP tools” list. |
-| `/registration` | Long-form article + bullet official links + `Checklist`. |
-| `/permanent-residence` | **Client journey:** pathway `<select>` → conditional official links + `Checklist` → horizontal rule → embedded `EinbuergerungstestPanel` (test booking + watch). |
-| `/citizenship` | Article + checklist + embedded `EinbuergerungstestPanel`. |
-| `/einbuergerungstest` | Standalone intro + full `EinbuergerungstestPanel`. |
-| `/exams` | Intro + `ExamDirectoryClient` (filters + table). |
-| `/privacy`, `/imprint` | Legal/static (not detailed here). |
-| `/watches/confirmed` | Post-email-confirm page (minimal). |
-
-**UX pattern:** Mostly **article + sections**; **no stepper/progress UI**, no breadcrumbs except text links “← Journey hub” at bottom of many pages.
+| `/` | Journey hub driven by **`journeys`** — three cards (emoji, title, tagline, intro, timeline) + MVP tools panel. |
+| `/registration` | Content from **`getJourney("registration")`** — documents list, official links, checklist from **steps**. |
+| `/permanent-residence` | **`PermanentResidenceJourney`** — pathway select + **`permanent-residence-pathways`** + **`EinbuergerungstestPanel`**; intro blends **`getJourney("residence")`**. |
+| `/citizenship` | **`getJourney("citizenship")`** + **`EinbuergerungstestPanel`**. |
+| `/einbuergerungstest` | Intro + panel. |
+| `/exams` | **`ExamDirectoryClient`**. |
+| `/privacy`, `/imprint` | Legal stubs, semantic typography. |
+| `/watches/confirmed` | Watch SSE / permission UI. |
 
 ---
 
-## 6. Recurring layout & component patterns
+## 6. Recurring patterns
 
-### 6.1 “Card grid” (home journey cards)
+### Home journey cards
 
-- `grid gap-4 sm:grid-cols-3`
-- Card: entire `<Link>` is the hit target — `rounded-lg border border-zinc-200 bg-white p-5 shadow-sm` + hover `hover:border-zinc-400` (dark: `dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-600`).
+- `rounded-xl border bg-gradient-card shadow-soft`; accent-specific **`border-*` / hover shadow** (`shadow-pop` for coral).
 
-### 6.2 Article pages (registration, etc.)
+### Panels & forms
 
-- Outer `article className="space-y-6"` or `space-y-8`.
-- Lists: `list-disc … pl-5 text-zinc-700 dark:text-zinc-300`.
-- Inline links: `underline` on `<a>` (often no distinct colour vs body—emerald reserved for some panels).
+- **Rounded-xl**, **`border-border`**, **`bg-card/***`**, **`shadow-soft`**; inputs use **`border-input bg-background`**; primary actions **`bg-primary text-primary-foreground`**.
 
-### 6.3 Bordered panels / forms
+### `Checklist`
 
-Common recipe:
+- **`bg-gradient-card`**, **`text-muted-foreground`** rows.
 
-- Container: `rounded-lg border border-zinc-200 … p-4` + `dark:border-zinc-800 dark:bg-zinc-900` (sometimes `bg-white`).
-- Inputs: `w-full rounded border border-zinc-300 px-3 py-2 text-sm` + dark border/background variants.
-- Primary button (watch form): `rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white` + `dark:bg-zinc-100 dark:text-zinc-950`, `disabled:opacity-60`.
+### `EinbuergerungstestPanel`
 
-### 6.4 `Checklist` component
+- Campus cards: selected state **`ring-primary/35`**; outbound links **`text-primary`**.
 
-- Section: `mt-8 rounded-lg border … bg-white p-4` (dark variants).
-- Title: `text-base font-semibold`.
-- Rows: checkbox (unstyled sizing `mt-1`) + `text-sm leading-relaxed`.
-- Footer note: `text-xs text-zinc-500`.
-- State: **`localStorage` per `storageKey`**, restored on mount.
+### `ExamDirectoryClient`
 
-### 6.5 `EinbuergerungstestPanel`
-
-- Vertical `space-y-8` stacking: optional intro blocks → **campus section** → **watch section**.
-- Campus section: `rounded-lg border … bg-zinc-50/70 p-4` (dark tinted).
-- **Campus picker:** responsive `grid gap-3 sm:grid-cols-2`; each cell is a **full-width `<button>`** (card) with nested `<a>` for “Open booking on Service Berlin →” (`stopPropagation` on link click).
-- **Selected card:** thick ring: `border-zinc-900 ring-2 ring-zinc-900` (dark: light border/ring).
-- **Unselected:** `border-zinc-200 bg-white hover:border-zinc-400` (dark variants).
-- **Outbound link styling on cards:** emerald + underline (`text-emerald-800` / `dark:text-emerald-300`).
-
-### 6.6 `WatchWizard` (slot notifier form)
-
-- Form panel: bordered white/zinc card, dense vertical `space-y-6`.
-- Fields: labelled blocks (`block text-sm` + `font-medium` label).
-- Checkbox/radio grids for weekdays, time bands, notification mode.
-- Legal consent checkboxes full-width.
-
-### 6.7 `ExamDirectoryClient`
-
-- Filter chips: row of `<button>`s — inactive = bordered; active = inverted **zinc fill** (`bg-zinc-900 text-white` / dark inverse).
-- Table: `overflow-x-auto rounded-lg border`, header `bg-zinc-50 text-xs uppercase text-zinc-600` (dark: `dark:bg-zinc-900`).
-- Rows: zebra `odd:bg-white even:bg-zinc-50` (+ dark zebra).
+- Pills: active **`bg-primary`**, inactive **`border-border bg-card/70`**; table uses **`muted` / `card`** stripes.
 
 ---
 
-## 7. Interaction & accessibility (current state)
+## 7. Content source of truth
 
-- **Focus:** Campus cards use `focus-visible:ring-2 focus-visible:ring-zinc-400`; other controls mostly browser default.
-- **No:** skip link, landmarks beyond implicit `<main>`, route-announcing changes for SPA sections, toast system, modal drawer, skeleton loaders (mostly text “Loading…”).
-- **Dark mode:** System only; footer background in dark is `dark:bg-zinc-950` while body is also `zinc-950` — subtle contrast distinctions rely on borders.
+- **`src/lib/journeys.ts`** — shared titles, taglines, intros, document bullets, official links, step copy, emoji, accent labels for the three flagship journeys.
 
 ---
 
-## 8. Content & tone
+## 8. File map
 
-- Plain **English**; frequent **disclaimers** (non-official, verify on government sites).
-- **No illustrations**, **no icon set** (except default Next/favicon in app); **no photography**.
-- Long **external links** inline in prose and lists.
-
----
-
-## 9. What is *not* defined (design gaps)
-
-- No **design tokens file** or Figma alignment documented in repo.
-- No **consistent button variants** beyond ad-hoc classes (primary = zinc inversion; chips = bordered vs filled).
-- No **spacing scale abstraction** — arbitrary `space-y-*`, `p-*`, `gap-*`.
-- **Possible font stack conflict** (`Arial` vs Geist)—needs resolution if visual consistency matters.
-- **CSS variables for background** on `:root` vs Tailwind zinc on body—two parallel “sources of truth”.
-- No responsive typography scale (clamp / fluid type).
-- Header nav has **no mobile menu** — links wrap (`flex-wrap`) on small screens.
-
----
-
-## 10. File map (for implementers cross-referencing code)
-
-| Area | Primary files |
-|------|----------------|
-| Shell, fonts | `src/app/layout.tsx`, `src/app/globals.css` |
+| Area | Files |
+|------|--------|
+| Tokens & base styles | `src/app/globals.css` |
+| Fonts & root | `src/app/layout.tsx` |
+| Shell | `src/components/AppShellLayout.tsx`, `src/components/SidebarNav.tsx` |
+| Journey data | `src/lib/journeys.ts`, `src/lib/permanent-residence-pathways.ts` |
 | Home | `src/app/page.tsx` |
-| Journey pages | `src/app/registration/page.tsx`, `src/app/citizenship/page.tsx`, `src/app/permanent-residence/page.tsx`, `src/components/PermanentResidenceJourney.tsx` |
-| Einbürgerungstest | `src/app/einbuergerungstest/page.tsx`, `src/components/EinbuergerungstestPanel.tsx`, `src/components/WatchWizard.tsx` |
-| Exams | `src/app/exams/page.tsx`, `src/components/ExamDirectoryClient.tsx` |
-| Shared UI | `src/components/SiteHeader.tsx`, `src/components/SiteFooter.tsx`, `src/components/Checklist.tsx` |
-| Pathway copy (PR page) | `src/lib/permanent-residence-pathways.ts` |
+| Footer | `src/components/SiteFooter.tsx` |
 
 ---
 
-*Generated as a factual inventory of the implementation as of the date this file was added; update it when UI architecture changes materially.*
+*Update this file when the shell or token system changes materially.*

@@ -1,6 +1,6 @@
 export type CreateWatchBody = {
   email: string;
-  serviceTargetId: string;
+  serviceTargetIds: string[];
   allowedWeekdays: number[];
   allowMorning: boolean;
   allowAfternoon: boolean;
@@ -25,6 +25,18 @@ function validWeekdays(w: unknown): number[] | null {
   return [...new Set(nums)].sort((a, b) => a - b);
 }
 
+function coerceServiceTargetIds(body: Record<string, unknown>): string[] {
+  const raw = body.serviceTargetIds;
+  if (Array.isArray(raw) && raw.length > 0) {
+    return [...new Set(raw.map((x) => String(x).trim()).filter((x) => x.length >= 32))];
+  }
+  const legacy =
+    typeof body.serviceTargetId === "string" && body.serviceTargetId.trim().length >= 32
+      ? body.serviceTargetId.trim()
+      : "";
+  return legacy ? [legacy] : [];
+}
+
 export function parseCreateWatchBody(body: unknown): ValidationResult {
   const errors: Record<string, string> = {};
   if (!body || typeof body !== "object") {
@@ -33,11 +45,11 @@ export function parseCreateWatchBody(body: unknown): ValidationResult {
   const b = body as Record<string, unknown>;
   const email = typeof b.email === "string" ? b.email.trim() : "";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = "Valid email required";
-  const serviceTargetId =
-    typeof b.serviceTargetId === "string" && b.serviceTargetId.length > 10
-      ? b.serviceTargetId
-      : "";
-  if (!serviceTargetId) errors.serviceTargetId = "serviceTargetId required";
+
+  const serviceTargetIds = coerceServiceTargetIds(b);
+  if (serviceTargetIds.length === 0) {
+    errors.serviceTargetIds = "Select at least one VHS location";
+  }
   const allowedWeekdays = validWeekdays(b.allowedWeekdays);
   if (!allowedWeekdays) errors.allowedWeekdays = "Select at least Mon–Sat (1–6)";
 
@@ -49,9 +61,7 @@ export function parseCreateWatchBody(body: unknown): ValidationResult {
 
   const mode = b.notificationMode;
   const notificationMode =
-    mode === "email_only" ||
-    mode === "browser_session" ||
-    mode === "browser_session_and_email"
+    mode === "email_only" || mode === "browser_session" || mode === "browser_session_and_email"
       ? mode
       : null;
   if (!notificationMode) errors.notificationMode = "Invalid notification mode";
@@ -73,7 +83,7 @@ export function parseCreateWatchBody(body: unknown): ValidationResult {
     ok: true,
     value: {
       email,
-      serviceTargetId,
+      serviceTargetIds,
       allowedWeekdays: allowedWeekdays!,
       allowMorning,
       allowAfternoon,

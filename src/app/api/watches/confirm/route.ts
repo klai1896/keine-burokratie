@@ -1,7 +1,7 @@
-import { eq, desc } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db/client";
-import { availabilitySnapshot, watch } from "@/db/schema";
+import { availabilitySnapshot, watch, watchLocation } from "@/db/schema";
 import { publicAppUrl } from "@/lib/app-url";
 import { hashToken, generateToken } from "@/lib/tokens";
 
@@ -22,20 +22,28 @@ export async function GET(req: Request) {
     return NextResponse.redirect(new URL("/einbuergerungstest?info=already_confirmed", publicAppUrl()));
   }
 
-  const latest = await db
-    .select()
-    .from(availabilitySnapshot)
-    .where(eq(availabilitySnapshot.serviceTargetId, w.serviceTargetId))
-    .orderBy(desc(availabilitySnapshot.capturedAt))
-    .limit(1);
+  const locs = await db.select().from(watchLocation).where(eq(watchLocation.watchId, w.id));
 
   const manageToken = generateToken();
+
+  for (const loc of locs) {
+    const latest = await db
+      .select()
+      .from(availabilitySnapshot)
+      .where(eq(availabilitySnapshot.serviceTargetId, loc.serviceTargetId))
+      .orderBy(desc(availabilitySnapshot.capturedAt))
+      .limit(1);
+
+    await db
+      .update(watchLocation)
+      .set({ baselineSnapshotId: latest[0]?.id ?? null })
+      .where(and(eq(watchLocation.watchId, w.id), eq(watchLocation.serviceTargetId, loc.serviceTargetId)));
+  }
 
   await db
     .update(watch)
     .set({
       status: "active",
-      baselineSnapshotId: latest[0]?.id ?? null,
       manageTokenHash: hashToken(manageToken),
     })
     .where(eq(watch.id, w.id));

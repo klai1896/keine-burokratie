@@ -9,6 +9,7 @@ import {
   serial,
   index,
   uniqueIndex,
+  primaryKey,
   pgEnum,
 } from "drizzle-orm/pg-core";
 
@@ -67,9 +68,6 @@ export const watch = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     email: text("email").notNull(),
     emailHash: text("email_hash").notNull(),
-    serviceTargetId: uuid("service_target_id")
-      .notNull()
-      .references(() => serviceTarget.id),
     allowedWeekdays: integer("allowed_weekdays").array().notNull(),
     allowMorning: boolean("allow_morning").notNull(),
     allowAfternoon: boolean("allow_afternoon").notNull(),
@@ -79,11 +77,25 @@ export const watch = pgTable(
     manageTokenHash: text("manage_token_hash").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     lastNotifiedAt: timestamp("last_notified_at", { withTimezone: true }),
+  },
+  (t) => [index("watch_status_idx").on(t.status), index("watch_email_hash_idx").on(t.emailHash)],
+);
+
+/** Each active watch listens at one or more VHS campuses; baseline snapshots are per campus. */
+export const watchLocation = pgTable(
+  "watch_location",
+  {
+    watchId: uuid("watch_id")
+      .notNull()
+      .references(() => watch.id, { onDelete: "cascade" }),
+    serviceTargetId: uuid("service_target_id")
+      .notNull()
+      .references(() => serviceTarget.id),
     baselineSnapshotId: uuid("baseline_snapshot_id").references(() => availabilitySnapshot.id),
   },
   (t) => [
-    index("watch_target_status_idx").on(t.serviceTargetId, t.status),
-    index("watch_email_hash_idx").on(t.emailHash),
+    primaryKey({ columns: [t.watchId, t.serviceTargetId] }),
+    index("watch_location_target_idx").on(t.serviceTargetId),
   ],
 );
 
@@ -124,6 +136,8 @@ export const examListing = pgTable(
     levels: text("levels").array().notNull(),
     priceDisplay: text("price_display").notNull(),
     availableDatesDisplay: text("available_dates_display"),
+    /** First exam date where the institute still shows an active booking control (may be null if ingest cannot reach the API). */
+    soonestBookableAt: timestamp("soonest_bookable_at", { withTimezone: true }),
     bookingUrl: text("booking_url").notNull(),
     sourcePageUrl: text("source_page_url").notNull(),
     lastVerified: timestamp("last_verified", { withTimezone: true }).notNull().defaultNow(),
@@ -147,4 +161,27 @@ export const serviceTargetPollState = pgTable(
     backoffSec: integer("backoff_sec").notNull().default(60),
     lastError: text("last_error"),
   },
+);
+
+/** Saves permanent-residence checklist progress + optional daily email reminders (hashed lookup by access token). */
+export const prChecklistProgress = pgTable(
+  "pr_checklist_progress",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    accessToken: text("access_token").notNull().unique(),
+    email: text("email").notNull(),
+    emailHash: text("email_hash").notNull(),
+    pathwayId: text("pathway_id").notNull(),
+    checkedJson: jsonb("checked_json").notNull().$type<Record<string, boolean>>(),
+    remindersEnabled: boolean("reminders_enabled").notNull().default(false),
+    consentPrivacy: boolean("consent_privacy").notNull().default(false),
+    consentReminders: boolean("consent_reminders").notNull().default(false),
+    lastReminderAt: timestamp("last_reminder_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("pr_progress_email_hash_idx").on(t.emailHash),
+    index("pr_progress_reminders_idx").on(t.remindersEnabled, t.lastReminderAt),
+  ],
 );
