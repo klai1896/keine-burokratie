@@ -11,9 +11,7 @@ const connectionString = resolveDatabaseUrl() ?? "postgresql://localhost:5432/ke
 if (process.env.VERCEL === "1") {
   const diag = getDatabaseUrlDiagnostics();
   if (!diag.resolved) {
-    console.error(
-      "[db] No hosted Postgres URL. Connect Vercel Postgres (POSTGRES_URL) or set DATABASE_URL to a non-localhost URL, then redeploy.",
-    );
+    console.error("[db] No hosted Postgres URL.", diag.hint ?? "Set DATABASE_URL or link Supabase Storage, then redeploy.");
   } else if (diag.skippedLocalhostDatabaseUrl) {
     console.warn(
       `[db] Ignoring localhost DATABASE_URL on Vercel; using ${diag.host ?? "hosted"} instead. Remove the localhost DATABASE_URL from Environment Variables to avoid confusion.`,
