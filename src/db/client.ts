@@ -1,26 +1,24 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import { getDatabaseUrlDiagnostics, resolveDatabaseUrl } from "@/lib/database-url";
 import * as schema from "./schema";
 
-/**
- * Vercel Storage / marketplace Postgres often injects `POSTGRES_URL` (or `POSTGRES_PRISMA_URL`);
- * this app historically used `DATABASE_URL` only. Prefer explicit DATABASE_URL when set.
- */
-export function envDatabaseUrl(): string | undefined {
-  const u =
-    process.env.DATABASE_URL?.trim() ||
-    process.env.POSTGRES_URL?.trim() ||
-    process.env.POSTGRES_PRISMA_URL?.trim();
-  return u || undefined;
-}
+export { resolveDatabaseUrl as envDatabaseUrl };
 
-/** Local dev fallback only — on Vercel use DATABASE_URL or linked Storage `POSTGRES_URL`. */
-const connectionString = envDatabaseUrl() ?? "postgresql://localhost:5432/keine_burokratie";
+/** Local dev fallback only — on Vercel use hosted DATABASE_URL or linked POSTGRES_URL. */
+const connectionString = resolveDatabaseUrl() ?? "postgresql://localhost:5432/keine_burokratie";
 
-if (process.env.VERCEL === "1" && !envDatabaseUrl()) {
-  console.error(
-    "[db] No Postgres URL: set DATABASE_URL, or connect Vercel Postgres so POSTGRES_URL is injected, then redeploy.",
-  );
+if (process.env.VERCEL === "1") {
+  const diag = getDatabaseUrlDiagnostics();
+  if (!diag.resolved) {
+    console.error(
+      "[db] No hosted Postgres URL. Connect Vercel Postgres (POSTGRES_URL) or set DATABASE_URL to a non-localhost URL, then redeploy.",
+    );
+  } else if (diag.skippedLocalhostDatabaseUrl) {
+    console.warn(
+      `[db] Ignoring localhost DATABASE_URL on Vercel; using ${diag.host ?? "hosted"} instead. Remove the localhost DATABASE_URL from Environment Variables to avoid confusion.`,
+    );
+  }
 }
 
 const globalForDb = globalThis as unknown as { pool?: Pool };

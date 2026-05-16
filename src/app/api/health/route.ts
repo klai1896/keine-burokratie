@@ -2,12 +2,14 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { workerHeartbeat } from "@/db/schema";
 import { isBerlinPollWindowActive, berlinNow } from "@/lib/berlin";
+import { getDatabaseUrlDiagnostics } from "@/lib/database-url";
 
 export const runtime = "nodejs";
 
 export async function GET() {
   let ok = true;
   let dbState: string = "up";
+  const dbEnv = getDatabaseUrlDiagnostics();
 
   try {
     await db.execute(sql`select 1`);
@@ -22,6 +24,7 @@ export async function GET() {
     return Response.json({
       ok,
       db: dbState,
+      dbEnv,
       workerLastRun: last,
       pollWindowActive,
     });
@@ -32,6 +35,7 @@ export async function GET() {
       {
         ok,
         db: dbState,
+        dbEnv,
         workerLastRun: null,
         pollWindowActive: isBerlinPollWindowActive(berlinNow()),
       },
